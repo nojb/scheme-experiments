@@ -54,7 +54,12 @@
       ((char->integer)
        (emit-expr (primcall-arg1 x))
        (emit "shrq	$~a, %rax" (- char-shift fixnum-shift))
-       (emit "orq	$~a, %rax" fixnum-tag))))))
+       (emit "orq	$~a, %rax" fixnum-tag))
+      ((integer->char)
+       (emit-expr (primcall-arg1 x))
+       (emit "shrq	$1, %rax")
+       (emit "shlq	$~a, %rax" char-shift)
+       (emit "orq	$~a, %rax" char-tag))))))
 
 (define (compile-all x)
   (emit ".text")
