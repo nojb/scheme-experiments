@@ -18,12 +18,15 @@
 (define char-shift 8)
 (define char-tag #b1010)
 
+(define emptylist-tag #b1110)
+
 (define (compile-program x)
   (define (immediate-rep x)
     (cond
      ((integer? x) (fxlogor (fxsll x fixnum-shift) fixnum-tag))
      ((boolean? x) (fxlogor (fxsll (if x 1 0) boolean-shift) boolean-tag))
-     ((char? x) (fxlogor (fxsll (char->integer x) char-shift) char-tag))))
+     ((char? x) (fxlogor (fxsll (char->integer x) char-shift) char-tag))
+     ((null? x) emptylist-tag)))
   (emit "movl	$~a, %eax" (immediate-rep x))
   (emit "retq"))
 
