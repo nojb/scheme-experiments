@@ -1,3 +1,5 @@
+(import (chezscheme))
+
 (define (emit . args)
   (write-char #\tab)
   (apply printf args)
@@ -20,21 +22,41 @@
 
 (define emptylist-tag #b1110)
 
-(define (compile-program x)
-  (define (immediate-rep x)
-    (cond
-     ((integer? x) (fxlogor (fxsll x fixnum-shift) fixnum-tag))
-     ((boolean? x) (fxlogor (fxsll (if x 1 0) boolean-shift) boolean-tag))
-     ((char? x) (fxlogor (fxsll (char->integer x) char-shift) char-tag))
-     ((null? x) emptylist-tag)))
-  (emit "movl	$~a, %eax" (immediate-rep x))
-  (emit "retq"))
+(define (immediate? e)
+  (not (pair? e)))
+
+(define (primcall? e)
+  (and (pair? e) (eq? (car e) 'primcall)))
+
+(define (primcall-op e)
+  (cadr e))
+
+(define (primcall-arg1 e)
+  (caddr e))
+
+(define (immediate-rep x)
+  (cond
+   ((integer? x) (fxlogor (fxsll x fixnum-shift) fixnum-tag))
+   ((boolean? x) (fxlogor (fxsll (if x 1 0) boolean-shift) boolean-tag))
+   ((char? x) (fxlogor (fxsll (char->integer x) char-shift) char-tag))
+   ((null? x) emptylist-tag)
+   (else (error 'immediate-rep "unhandled"))))
+
+(define (emit-expr x)
+  (cond
+   ((immediate? x)
+    (emit "movl	$~a, %eax" (immediate-rep x)))
+   ((primcall? x)
+    (case (primcall-op x)
+      ((add1)
+       (emit-expr (primcall-arg1 x))
+       (emit "addl	$2, %eax"))))))
 
 (define (compile-all x)
   (emit ".text")
   (emit ".globl	_scheme_entry")
-  ;; (emit ".type	_scheme_entry, @function")
   (emit-symbol "scheme_entry")
-  (compile-program x))
+  (emit-expr x)
+  (emit "retq"))
 
 (compile-all (read))
