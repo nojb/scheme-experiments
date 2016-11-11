@@ -50,7 +50,11 @@
     (case (primcall-op x)
       ((add1)
        (emit-expr (primcall-arg1 x))
-       (emit "addl	$2, %eax"))))))
+       (emit "addl	$2, %eax"))
+      ((char->integer)
+       (emit-expr (primcall-arg1 x))
+       (emit "shrl	$~a, %eax" (- char-shift fixnum-shift))
+       (emit "orl	$~a, %eax" fixnum-tag))))))
 
 (define (compile-all x)
   (emit ".text")
