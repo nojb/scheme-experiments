@@ -6,7 +6,7 @@
   (newline))
 
 (define (emit-label label)
-  (printf "L~a:\n" label))
+  (printf "~a:\n" label))
 
 (define (emit-symbol s)
   (printf "_~a:\n" s))
@@ -82,11 +82,43 @@
 (define (body e)
   (cddr e))
 
+(define (if? e)
+  (and (pair? e) (eq? (car e) 'if)))
+
+(define (emit-cmpq op1 op2)
+  (emit "cmpq	~a, ~a" op1 op2))
+
+(define label-count -1)
+
+(define (unique-label)
+  (set! label-count (+ label-count 1))
+  (string-append "L" (number->string label-count)))
+
+(define (emit-if test conseq altern si env)
+  (let* ((L0 (unique-label)) (L1 (unique-label)))
+    (emit-expr test si env)
+    (emit "cmpq	$~a, %rax" (immediate-rep #f))
+    (emit "je	~a" L0)
+    (emit-expr conseq si env)
+    (emit "jmp	~a" L1)
+    (emit-label L0)
+    (emit-expr altern si env)
+    (emit-label L1)))
+
 (define (emit-expr-list x si env)
   (if (pair? x)
       (begin
         (emit-expr (car x) si env)
         (emit-expr-list (cdr x) si env))))
+
+(define (test x)
+  (cadr x))
+
+(define (conseq x)
+  (caddr x))
+
+(define (altern x)
+  (cadddr x))
 
 (define (emit-expr x si env)
   (cond
@@ -96,6 +128,8 @@
     (emit "movq	~a(%rsp), %rax" (lookup x env)))
    ((let? x)
     (emit-let (bindings x) (body x) si env))
+   ((if? x)
+    (emit-if (test x) (conseq x) (altern x) si env))
    ((primcall? x)
     (case (primcall-op x)
       ((add1)
