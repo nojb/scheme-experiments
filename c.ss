@@ -34,6 +34,9 @@
 (define (primcall-arg1 e)
   (caddr e))
 
+(define (primcall-arg2 e)
+  (cadddr e))
+
 (define (primcall-args e)
   (cddr e))
 
@@ -120,6 +123,8 @@
 (define (altern x)
   (cadddr x))
 
+(define cons-tag #x03)
+
 (define (emit-expr x si env)
   (cond
    ((immediate? x)
@@ -162,7 +167,22 @@
                        (emit-expr (car args) (- si wordsize) env)
                        (emit "addq	~a(%rsp), %rax" si)
                        (loop (cdr args) si))))
-               (emit "subq	$~a, %rax" (length args))))))))))
+               (emit "subq	$~a, %rax" (length args))))))
+      ((cons)
+       (let ((a (primcall-arg1 x)) (b (primcall-arg2 x)))
+         (emit "movb	$~a, 0(%rsi)" cons-tag)
+         (emit-expr a si env)
+         (emit "movq	%rax, ~a(%rsi)" wordsize)
+         (emit-expr b si env)
+         (emit "movq	%rax, ~a(%rsi)" (* 2 wordsize))
+         (emit "leaq	~a(%rsi), %rax" wordsize)
+         (emit "addq	$~a, %rsi" (* 3 wordsize))))
+      ((car)
+       (emit-expr (primcall-arg1 x) si env)
+       (emit "movq	0(%rax), %rax"))
+      ((cdr)
+       (emit-expr (primcall-arg1 x) si env)
+       (emit "movq	~a(%rax), %rax" wordsize))))))
 
 (define (compile-all x)
   (emit ".text")
