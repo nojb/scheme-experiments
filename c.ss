@@ -23,7 +23,7 @@
 (define emptylist-tag #b1110)
 
 (define (immediate? e)
-  (not (pair? e)))
+  (or (integer? e) (boolean? e) (char? e) (null? e)))
 
 (define (primcall? e)
   (and (pair? e) (eq? (car e) 'primcall)))
@@ -43,30 +43,75 @@
    ((boolean? x) (fxlogor (fxsll (if x 1 0) boolean-shift) boolean-tag))
    ((char? x) (fxlogor (fxsll (char->integer x) char-shift) char-tag))
    ((null? x) emptylist-tag)
-   (else (error 'immediate-rep "unhandled"))))
+   (else (error 'immediate-rep "unhandled" x))))
 
 (define wordsize 8)
 
-(define (emit-expr x si)
+(define (lookup x env)
+  (cdr (or (assoc x env) (error 'lookup "not found" x env))))
+
+(define (variable? x)
+  (symbol? x))
+
+(define (add-var x si env)
+  (cons `(,x . ,si) env))
+
+(define (let? e)
+  (and (pair? e) (eq? (car e) 'let)))
+
+(define (rhs e)
+  (cadr e))
+
+(define (lhs e)
+  (car e))
+
+(define (emit-let bindings body si env)
+  (let loop ((bindings bindings) (si si) (env env))
+    (cond
+     ((null? bindings)
+      (emit-expr-list body si env))
+     (else
+      (let ((binding (car bindings)))
+        (emit-expr (rhs binding) si env)
+        (emit "movq	%rax, ~a(%rsp)" si)
+        (loop (cdr bindings) (- si wordsize) (add-var (lhs binding) si env)))))))
+
+(define (bindings e)
+  (cadr e))
+
+(define (body e)
+  (cddr e))
+
+(define (emit-expr-list x si env)
+  (if (pair? x)
+      (begin
+        (emit-expr (car x) si env)
+        (emit-expr-list (cdr x) si env))))
+
+(define (emit-expr x si env)
   (cond
    ((immediate? x)
     (emit "movq	$~a, %rax" (immediate-rep x)))
+   ((variable? x)
+    (emit "movq	~a(%rsp), %rax" (lookup x env)))
+   ((let? x)
+    (emit-let (bindings x) (body x) si env))
    ((primcall? x)
     (case (primcall-op x)
       ((add1)
-       (emit-expr (primcall-arg1 x) si)
+       (emit-expr (primcall-arg1 x) si env)
        (emit "addq	$2, %rax"))
       ((char->integer)
-       (emit-expr (primcall-arg1 x) si)
+       (emit-expr (primcall-arg1 x) si env)
        (emit "shrq	$~a, %rax" (- char-shift fixnum-shift))
        (emit "orq	$~a, %rax" fixnum-tag))
       ((integer->char)
-       (emit-expr (primcall-arg1 x) si)
+       (emit-expr (primcall-arg1 x) si env)
        (emit "shrq	$1, %rax")
        (emit "shlq	$~a, %rax" char-shift)
        (emit "orq	$~a, %rax" char-tag))
       ((integer?)
-       (emit-expr (primcall-arg1 x) si)
+       (emit-expr (primcall-arg1 x) si env)
        (emit "andq	$1, %rax")
        (emit "shlq	$~a, %rax" boolean-shift)
        (emit "orq	$~a, %rax" boolean-tag))
@@ -75,12 +120,12 @@
          (if (null? args)
              (emit "movq	$1, %rax")
              (let ((x (car args)) (args (cdr args)))
-               (emit-expr x si)
+               (emit-expr x si env)
                (let loop ((args args) (si si))
                  (if (pair? args)
                      (begin
                        (emit "movq	%rax, ~a(%rsp)" si)
-                       (emit-expr (car args) (- si wordsize))
+                       (emit-expr (car args) (- si wordsize) env)
                        (emit "addq	~a(%rsp), %rax" si)
                        (loop (cdr args) si))))
                (emit "subq	$~a, %rax" (length args))))))))))
@@ -89,7 +134,7 @@
   (emit ".text")
   (emit ".globl	_scheme_entry")
   (emit-symbol "scheme_entry")
-  (emit-expr x (- wordsize))
+  (emit-expr x (- wordsize) '())
   (emit "retq"))
 
 (compile-all (read))
