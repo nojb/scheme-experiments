@@ -1,100 +1,105 @@
 (import (chezscheme))
 
-(define (emit . args)
-  (write-char #\tab)
-  (apply printf args)
-  (newline))
-
-(define (emit-label label)
-  (printf "~a:\n" label))
-
-(define (emit-symbol s)
-  (printf "_~a:\n" s))
-
-;; (define fixnum-shift 1)
-;; (define fixnum-tag 1)
-
-;; (define boolean-shift 4)
-;; (define boolean-tag #b0110)
-
-;; (define char-shift 8)
-;; (define char-tag #b1010)
-
-;; (define emptylist-tag #b1110)
-
-(define wordsize 8)
-
-(define (lookup x env)
-  (cdr (or (assoc x env) (error 'lookup "not found" x env))))
-
-(define (variable? x)
-  (symbol? x))
-
-(define (add-var x si env)
-  (cons `(,x . ,si) env))
-
-(define (emit-let bindings body si env)
-  (let loop ((bindings bindings) (si si) (env env))
-    (cond
-      ((null? bindings)
-        (emit-expr-list body si env))
-      (else
-        (let ((binding (car bindings)))
-          (emit-expr (cadr binding) si env)
-          (emit "movq	%rax, ~a(%rsp)" si)
-          (loop (cdr bindings) (- si wordsize)
-            (add-var (car binding) si env)))))))
-
-(define label-count -1)
-
-(define (unique-label)
-  (set! label-count (+ label-count 1))
-  (string-append "L" (number->string label-count)))
-
-(define (emit-if test conseq altern si env)
-  (let* ((L0 (unique-label)) (L1 (unique-label)))
-    (emit-expr test si env)
-    (emit "cmpq	$0, %rax")
-    (emit "je	~a" L0)
-    (emit-expr conseq si env)
-    (emit "jmp	~a" L1)
-    (emit-label L0)
-    (emit-expr altern si env)
-    (emit-label L1)))
-
-(define (emit-expr-list x si env)
-  (if (pair? x)
-    (begin
-      (emit-expr (car x) si env)
-      (emit-expr-list (cdr x) si env))))
-
-(define (emit-expr x si env)
+(define (comp-expr exp cont)
   (cond
-    ((integer? x) (emit "movq	$~a, %rax" x))
-    ((boolean? x) (emit "movq	$~a, %rax" (if x 1 0)))
-    ((char? x) (emit "movq	$~a, %rax" (char->integer x)))
-    ((symbol? x) (emit "movq	~a(%rsp), %rax" (lookup x env)))
-    ((pair? x)
-      (case (car x)
-        ((set!)
-          (emit-expr (caddr x) si env)
-          (emit "movq	%rax, ~a(%rsp)" (lookup (cadr x) env)))
-        ((let)
-          (emit-let (cadr x) (cddr x) si env))
-        ((if)
-          (emit-if (cadr x) (caddr x) (cadddr x) si env))
-        ((+)
-          (emit-expr (cadr x) si env)
-          (emit "pushq	%rax")
-          (emit-expr (caddr x) si env)
-          (emit "addq	(%rsp), %rax")
-          (emit "popq"))))))
+    ((integer? exp) `(const ,exp . ,cont))
+    (else (error 'comp-expr "Not handled" exp))))
 
-(define (compile-all x)
-  (emit ".text")
-  (emit ".globl	_oberon_entry")
-  (emit-symbol "oberon_entry")
-  (emit-expr x (- wordsize) '())
-  (emit "retq"))
+(define (compile-phrase expr)
+  (comp-expr expr '(stop)))
 
-(compile-all (read))
+(define out-buffer (make-bytevector 1024))
+(define out-position 0)
+
+(define (out-word b1 b2 b3 b4)
+  (if (>= out-position (bytevector-length out-buffer))
+    (let ((len (bytevector-length out-buffer))
+           (new-buffer (make-bytevector (* 2  len))))
+      (bytevector-copy! new-buffer 0 out-buffer 0 len)
+      (set! out-buffer new-buffer)))
+  (bytevector-u8-set! out-buffer out-position (fxlogand b1 #xff))
+  (bytevector-u8-set! out-buffer (+ 1 out-position) (fxlogand b2 #xff))
+  (bytevector-u8-set! out-buffer (+ 2 out-position) (fxlogand b3 #xff))
+  (bytevector-u8-set! out-buffer (+ 3 out-position) (fxlogand b4 #xff))
+  (set! out-position (+ 4 out-position)))
+
+(define (out opcode)
+  (out-word opcode 0 0 0))
+
+(define (out-int n)
+  (out-word n (fxsra n 8) (fxsra n 16) (fxsra n 24)))
+
+(define CONSTINT 103)
+(define STOP 143)
+
+(define (emit-instr code)
+  (case (car code)
+    ((const)
+      (out CONSTINT)
+      (out-int (cadr code))
+      (emit-instr (cddr code)))
+    ((stop)
+      (out STOP))
+    (else
+      (error 'emit-instr "Not hanlded" code))))
+
+(define (emit code)
+  (set! out-position 0)
+  (emit-instr code)
+  (let ((bv (make-bytevector out-position)))
+    (bytevector-copy! bv 0 out-buffer 0 out-position)
+    bv))
+
+(define section-table '())
+(define section-beginning 0)
+
+(define (init-record port)
+  (set! section-beginning (port-position port))
+  (set! section-table '()))
+
+(define (record port name)
+  (let ((pos (port-position port)))
+    (set! section-table (cons `(,name ,(- pos section-beginning)) section-table))
+    (set! section-beginning pos)))
+
+(define exec-magic-number "Caml1999X011")
+
+(define (output-string port string)
+  (put-bytevector port (string->utf8 string)))
+
+(define (output-binary-int port n)
+  (put-u8 port (fxlogand n #xff))
+  (put-u8 port (fxlogand (fxsra n 8) #xff))
+  (put-u8 port (fxlogand (fxsra n 16) #xff))
+  (put-u8 port (fxlogand (fxsra n 24) #xff)))
+
+(define (write-toc-and-trailer port)
+  (iter (lambda (entry)
+          (let ((name (car entry)) (len (cadr entry)))
+            (output-string port name)
+            (output-binary-int port len)))
+    (reverse section-table))
+  (output-binary-int port (length section-table))
+  (output-string port exec-magic-number)
+  (set! section-table '()))
+
+(define (iter f l)
+  (if (pair? l)
+    (begin (f (car l)) (iter f (cdr l)))))
+
+(define (link-bytecode tolink exec-name)
+  (if (file-exists? exec-name) (delete-file exec-name))
+  (let ((port (open-file-output-port exec-name)))
+    (init-record port)
+    (put-bytevector port tolink)
+    (record port "CODE")
+    (record port "DATA")
+    (record port "SYMB")
+    (record port "CRCS")
+    (write-toc-and-trailer port)
+    (close-port port)))
+
+(define (main)
+  (link-bytecode (emit (compile-phrase (read))) "a.out"))
+
+(main)
