@@ -392,6 +392,8 @@ CAMLexport void caml_main(char **argv)
       caml_debugger(UNCAUGHT_EXC);
     }
     caml_fatal_uncaught_exception(caml_exn_bucket);
+  } else {
+    printf ("%ld\n", Long_val (res));
   }
 }
 
