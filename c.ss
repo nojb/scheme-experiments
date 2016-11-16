@@ -86,6 +86,7 @@
     (init-record port)
     (put-bytevector port out-buffer 0 out-position)
     (record port "CODE")
+    (record port "PRIM")
     (record port "DATA")
     (record port "SYMB")
     (record port "CRCS")
