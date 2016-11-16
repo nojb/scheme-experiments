@@ -15,7 +15,7 @@
   (if (>= out-position (bytevector-length out-buffer))
     (let ((len (bytevector-length out-buffer))
            (new-buffer (make-bytevector (* 2  len))))
-      (bytevector-copy! new-buffer 0 out-buffer 0 len)
+      (bytevector-copy! out-buffer 0 new-buffer 0 len)
       (set! out-buffer new-buffer)))
   (bytevector-u8-set! out-buffer out-position (fxlogand b1 #xff))
   (bytevector-u8-set! out-buffer (+ 1 out-position) (fxlogand b2 #xff))
@@ -43,13 +43,6 @@
     (else
       (error 'emit-instr "Not hanlded" code))))
 
-(define (emit code)
-  (set! out-position 0)
-  (emit-instr code)
-  (let ((bv (make-bytevector out-position)))
-    (bytevector-copy! bv 0 out-buffer 0 out-position)
-    bv))
-
 (define section-table '())
 (define section-beginning 0)
 
@@ -68,10 +61,14 @@
   (put-bytevector port (string->utf8 string)))
 
 (define (output-binary-int port n)
-  (put-u8 port (fxlogand n #xff))
-  (put-u8 port (fxlogand (fxsra n 8) #xff))
+  (put-u8 port (fxlogand (fxsra n 24) #xff))
   (put-u8 port (fxlogand (fxsra n 16) #xff))
-  (put-u8 port (fxlogand (fxsra n 24) #xff)))
+  (put-u8 port (fxlogand (fxsra n 8) #xff))
+  (put-u8 port (fxlogand n #xff)))
+
+(define (iter f l)
+  (if (pair? l)
+    (begin (f (car l)) (iter f (cdr l)))))
 
 (define (write-toc-and-trailer port)
   (iter (lambda (entry)
@@ -83,15 +80,11 @@
   (output-string port exec-magic-number)
   (set! section-table '()))
 
-(define (iter f l)
-  (if (pair? l)
-    (begin (f (car l)) (iter f (cdr l)))))
-
-(define (link-bytecode tolink exec-name)
+(define (link-bytecode exec-name)
   (if (file-exists? exec-name) (delete-file exec-name))
   (let ((port (open-file-output-port exec-name)))
     (init-record port)
-    (put-bytevector port tolink)
+    (put-bytevector port out-buffer 0 out-position)
     (record port "CODE")
     (record port "DATA")
     (record port "SYMB")
@@ -100,6 +93,7 @@
     (close-port port)))
 
 (define (main)
-  (link-bytecode (emit (compile-phrase (read))) "a.out"))
+  (emit-instr (compile-phrase (read)))
+  (link-bytecode "a.out"))
 
 (main)
