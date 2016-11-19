@@ -953,6 +953,9 @@ value caml_interprete(code_t prog, asize_t prog_size)
     Instruct(CONST3):
       accu = Val_int(3); Next;
 
+    Instruct(CONSTEMPTYLIST):
+      accu = Val_emptylist; Next;
+
     Instruct(PUSHCONST0):
       *--sp = accu; accu = Val_int(0); Next;
     Instruct(PUSHCONST1):

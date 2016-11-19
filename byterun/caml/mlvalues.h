@@ -319,7 +319,7 @@ CAMLextern header_t caml_atom_table[];
 #define Val_unit Val_int(0)
 
 /* List constructors */
-#define Val_emptylist Val_int(0)
+#define Val_emptylist 0x3
 #define Tag_cons 0
 
 /* The table of global identifiers */

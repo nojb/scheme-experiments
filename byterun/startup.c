@@ -278,7 +278,11 @@ extern int ensure_spacetime_dot_o_is_included;
 void scheme_write (value v)
 {
   if (Is_long (v)) {
-    printf ("%ld", Long_val (v));
+    if (v == Val_emptylist) {
+      printf ("()");
+    } else {
+      printf ("%ld", Long_val (v));
+    }
   } else {
     printf ("(");
     scheme_write (Field (v, 0));

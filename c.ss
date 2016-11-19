@@ -13,7 +13,7 @@
 
 (define (comp-expr exp cont)
   (cond
-    ((integer? exp) `(const ,exp . ,cont))
+    ((or (null? exp) (integer? exp)) `(const ,exp . ,cont))
     ((pair? exp)
       (case (car exp)
         ((cons)
@@ -58,12 +58,20 @@
 (define PUSH 9)
 (define MAKEBLOCK 62)
 (define GETFIELD 71)
+(define CONSTEMPTYLIST 148)
 
 (define (emit-instr code)
   (case (car code)
     ((const)
-      (out CONSTINT)
-      (out-int (cadr code))
+      (let ((c (cadr code)))
+        (cond
+          ((null? c)
+            (out CONSTEMPTYLIST))
+          ((integer? c)
+            (out CONSTINT)
+            (out-int c))
+          (else
+            (error 'emit-instr "Unhandled constant" c))))
       (emit-instr (cddr code)))
     ((push)
       (out PUSH)
