@@ -70,13 +70,13 @@ typedef uintnat mark_t;
 
 /* Conversion macro names are always of the form  "to_from". */
 /* Example: Val_long as in "Val from long" or "Val of long". */
-#define Val_long(x)     ((intnat) (((uintnat)(x) << 1)) + 1)
-#define Long_val(x)     ((x) >> 1)
-#define Max_long (((intnat)1 << (8 * sizeof(value) - 2)) - 1)
-#define Min_long (-((intnat)1 << (8 * sizeof(value) - 2)))
+#define Val_long(x)     ((intnat) (((uintnat)(x) << 2)) + 1)
+#define Long_val(x)     ((x) >> 2)
+#define Max_long (((intnat)1 << (8 * sizeof(value) - 3)) - 1)
+#define Min_long (-((intnat)1 << (8 * sizeof(value) - 3)))
 #define Val_int(x) Val_long(x)
 #define Int_val(x) ((int) Long_val(x))
-#define Unsigned_long_val(x) ((uintnat)(x) >> 1)
+#define Unsigned_long_val(x) ((uintnat)(x) >> 2)
 #define Unsigned_int_val(x)  ((int) Unsigned_long_val(x))
 
 /* Structure of the header:
