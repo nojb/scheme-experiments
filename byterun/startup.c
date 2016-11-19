@@ -273,6 +273,21 @@ extern void caml_install_invalid_parameter_handler();
 
 extern int ensure_spacetime_dot_o_is_included;
 
+/* Rudimentary implementation of write */
+
+void scheme_write (value v)
+{
+  if (Is_long (v)) {
+    printf ("%ld", Long_val (v));
+  } else {
+    printf ("(");
+    scheme_write (Field (v, 0));
+    printf (" . ");
+    scheme_write (Field (v, 1));
+    printf (")");
+  }
+}
+
 /* Main entry point when loading code from a file */
 
 CAMLexport void caml_main(char **argv)
@@ -393,10 +408,8 @@ CAMLexport void caml_main(char **argv)
     }
     caml_fatal_uncaught_exception(caml_exn_bucket);
   } else {
-    if (Is_long (res))
-      printf ("%ld\n", Long_val (res));
-    else
-      printf ("block!\n");
+    scheme_write (res);
+    printf ("\n");
   }
 }
 
