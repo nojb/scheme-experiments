@@ -18,6 +18,10 @@
       (case (car exp)
         ((cons)
           (comp-args (cdr exp) `(makeblock 2 0 . ,cont)))
+        ((car)
+          (comp-args (cdr exp) `(getfield 0 . ,cont)))
+        ((cdr)
+          (comp-args (cdr exp) `(getfield 1 . ,cont)))
         (else
           (error 'comp-expr "Primitive not handled" exp))))
     (else (error 'comp-expr "Not handled" exp))))
@@ -53,6 +57,7 @@
 (define STOP 143)
 (define PUSH 9)
 (define MAKEBLOCK 62)
+(define GETFIELD 71)
 
 (define (emit-instr code)
   (case (car code)
@@ -68,6 +73,10 @@
       (out-int (cadr code))
       (out-int (caddr code))
       (emit-instr (cdddr code)))
+    ((getfield)
+      (out GETFIELD)
+      (out-int (cadr code))
+      (emit-instr (cddr code)))
     ((stop)
       (out STOP))
     (else
