@@ -1,12 +1,32 @@
 (import (chezscheme))
 
+(define (comp-expr-list exprl cont)
+  (cond
+    ((pair? exprl)
+      (cond
+        ((null? (cdr exprl)) (comp-expr (car exprl) cont))
+        (else (comp-expr (car exprl) `(push . ,(comp-expr-list (cdr exprl) cont))))))
+    (else cont)))
+
+(define (comp-args argl cont)
+  (comp-expr-list (reverse argl) cont))
+
 (define (comp-expr exp cont)
   (cond
     ((integer? exp) `(const ,exp . ,cont))
+    ((pair? exp)
+      (case (car exp)
+        ((cons)
+          (comp-args (cdr exp) `(makeblock 2 0 . ,cont)))
+        (else
+          (error 'comp-expr "Primitive not handled" exp))))
     (else (error 'comp-expr "Not handled" exp))))
 
 (define (compile-phrase expr)
-  (comp-expr expr '(stop)))
+  (let ((res (comp-expr expr '(stop))))
+    (display res)
+    (newline)
+    res))
 
 (define out-buffer (make-bytevector 1024))
 (define out-position 0)
@@ -31,6 +51,8 @@
 
 (define CONSTINT 103)
 (define STOP 143)
+(define PUSH 9)
+(define MAKEBLOCK 62)
 
 (define (emit-instr code)
   (case (car code)
@@ -38,10 +60,18 @@
       (out CONSTINT)
       (out-int (cadr code))
       (emit-instr (cddr code)))
+    ((push)
+      (out PUSH)
+      (emit-instr (cdr code)))
+    ((makeblock)
+      (out MAKEBLOCK)
+      (out-int (cadr code))
+      (out-int (caddr code))
+      (emit-instr (cdddr code)))
     ((stop)
       (out STOP))
     (else
-      (error 'emit-instr "Not hanlded" code))))
+      (error 'emit-instr "Not handled" code))))
 
 (define section-table '())
 (define section-beginning 0)

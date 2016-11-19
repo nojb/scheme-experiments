@@ -393,7 +393,10 @@ CAMLexport void caml_main(char **argv)
     }
     caml_fatal_uncaught_exception(caml_exn_bucket);
   } else {
-    printf ("%ld\n", Long_val (res));
+    if (Is_long (res))
+      printf ("%ld\n", Long_val (res));
+    else
+      printf ("block!\n");
   }
 }
 
