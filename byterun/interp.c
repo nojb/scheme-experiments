@@ -719,10 +719,6 @@ value caml_interprete(code_t prog, asize_t prog_size)
     Instruct(GETFIELD3):
       accu = Field(accu, 3); Next;
     Instruct(GETFIELD):
-      if (Is_long (accu) || Tag_val (accu) != Tag_cons)
-        caml_fatal_error_arg("Fatal error: bad argument (%"
-                             ARCH_INTNAT_PRINTF_FORMAT "x)\n",
-                             (char *) (intnat) *(pc-1));
       accu = Field(accu, *pc); pc++; Next;
     Instruct(GETFLOATFIELD): {
       double d = Double_field(accu, *pc);

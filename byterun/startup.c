@@ -273,6 +273,28 @@ extern void caml_install_invalid_parameter_handler();
 
 extern int ensure_spacetime_dot_o_is_included;
 
+/* Rudimentary implementation of cons */
+
+CAMLexport value scheme_cons (value args[], int argc)
+{
+  CAMLparamN (args, argc);
+  CAMLlocal1 (cons);
+  cons = caml_alloc (2, 0);
+  Field (cons, 0) = args[0];
+  Field (cons, 1) = args[1];
+  CAMLreturn (cons);
+}
+
+CAMLexport value scheme_car (value args[], int argc)
+{
+  return Field (args[0], 0);
+}
+
+CAMLexport value scheme_cdr (value args[], int argc)
+{
+  return Field (args[0], 1);
+}
+
 /* Rudimentary implementation of write */
 
 void scheme_write (value v)

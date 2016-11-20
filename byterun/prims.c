@@ -342,6 +342,9 @@ extern value caml_weak_create();
 extern value caml_weak_get();
 extern value caml_weak_get_copy();
 extern value caml_weak_set();
+extern value scheme_cons();
+extern value scheme_cdr();
+extern value scheme_car();
 c_primitive caml_builtin_cprim[] = {
 	caml_abs_float,
 	caml_acos_float,
@@ -684,6 +687,9 @@ c_primitive caml_builtin_cprim[] = {
 	caml_weak_get,
 	caml_weak_get_copy,
 	caml_weak_set,
+	scheme_cons,
+	scheme_cdr,
+	scheme_car,
 	 0 };
 char * caml_names_of_builtin_cprim[] = {
 	"caml_abs_float",
@@ -1027,4 +1033,7 @@ char * caml_names_of_builtin_cprim[] = {
 	"caml_weak_get",
 	"caml_weak_get_copy",
 	"caml_weak_set",
+	"scheme_cons",
+	"scheme_cdr",
+	"scheme_car",
 	 0 };

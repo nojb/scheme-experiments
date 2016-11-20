@@ -56,19 +56,19 @@
 (define CONSTINT 103)
 (define STOP 143)
 (define PUSH 9)
-(define MAKEBLOCK 62)
-(define GETFIELD 71)
+;; (define MAKEBLOCK 62)
+;; (define GETFIELD 71)
 (define CONSTEMPTYLIST 148)
 (define C-CALLN 98)
 
-(define reloc-info '())
-
-(define (enter kind name)
-  (set! reloc-info (cons (cons kind (cons name out-position)) reloc-info)))
+(define c-primitives '())
 
 (define (slot-for-c-prim name)
-  (enter 'reloc-primitive name)
-  (out-int 0))
+  (cdr (or (assoc name c-primitives)
+         (let* ((n (length c-primitives))
+                 (entry (cons name n)))
+           (set! c-primitives (cons entry c-primitives))
+           entry))))
 
 (define (emit-instr code)
   (case (car code)
@@ -86,42 +86,24 @@
     ((push)
       (out PUSH)
       (emit-instr (cdr code)))
-    ((makeblock)
-      (out MAKEBLOCK)
-      (out-int (cadr code))
-      (out-int (caddr code))
-      (emit-instr (cdddr code)))
-    ((getfield)
-      (out GETFIELD)
-      (out-int (cadr code))
-      (emit-instr (cddr code)))
+    ;; ((makeblock)
+    ;;   (out MAKEBLOCK)
+    ;;   (out-int (cadr code))
+    ;;   (out-int (caddr code))
+    ;;   (emit-instr (cdddr code)))
+    ;; ((getfield)
+    ;;   (out GETFIELD)
+    ;;   (out-int (cadr code))
+    ;;   (emit-instr (cddr code)))
     ((c-call)
       (out C-CALLN)
       (out-int (caddr code))
-      (slot-for-c-prim (cadr code))
+      (out-int (slot-for-c-prim (cadr code)))
       (emit-instr (cdddr code)))
     ((stop)
       (out STOP))
     (else
       (error 'emit-instr "Not handled" code))))
-
-(define-record-type numtable (fields (mutable cnt) (mutable tbl)))
-
-(define empty-numtable '(0 . ()))
-
-(define (find-numtable nt key)
-  (cdr (assoc key (numtable-tbl nt))))
-
-(define (enter-numtable nt key)
-  (let ((n (+ (numtable-cnt nt) 1)))
-    (numtable-cnt-set! nt n)
-    (numtable-tbl-set! (cons (cons key n) (numtable-tbl nt)))))
-
-(define (incr-numtable nt key)
-  (let ((n (+ (numtable-cnt nt) 1)))
-    (numtable-cnt-set! nt n)))
-
-(define c-prim-table (make-numtable 0 '()))
 
 (define section-table '())
 (define section-beginning 0)
@@ -139,6 +121,13 @@
 
 (define (output-string port string)
   (put-bytevector port (string->utf8 string)))
+
+(define (output-primitive-table port)
+  (for-each (lambda (entry)
+              (let ((name (car entry)))
+                (output-string port name)
+                (put-u8 port 0)))
+    (reverse c-primitives)))
 
 (define (output-binary-int port n)
   (put-u8 port (fxlogand (fxsra n 24) #xff))
@@ -162,6 +151,7 @@
     (init-record port)
     (put-bytevector port out-buffer 0 out-position)
     (record port "CODE")
+    (output-primitive-table port)
     (record port "PRIM")
     (record port "DATA")
     (record port "SYMB")
@@ -171,8 +161,6 @@
 
 (define (main)
   (emit-instr (compile-phrase (read)))
-  (display reloc-info)
-  (newline)
   (link-bytecode "a.out"))
 
 (main)
