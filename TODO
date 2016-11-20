@@ -1,0 +1,9 @@
+- expose intern/extern to scheme and use it
+  to implement globals
+
+- decide if primitives can be overriden: ideally, the could
+  but it would only affect functions defined "after" the redefinition.
+
+- separate compilation: implement relocations
+
+- exception handling
