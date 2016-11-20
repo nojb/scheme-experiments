@@ -287,12 +287,22 @@ CAMLexport value scheme_cons (value args[], int argc)
 
 CAMLexport value scheme_car (value args[], int argc)
 {
-  return Field (args[0], 0);
+  CAMLparamN (args, argc);
+  CAMLlocal1 (arg);
+  if (argc != 1) caml_invalid_argument ("car");
+  arg = args[0];
+  if (Is_long (arg) || Tag_val (arg) != Tag_cons) caml_invalid_argument ("car");
+  CAMLreturn (Field (arg, 0));
 }
 
 CAMLexport value scheme_cdr (value args[], int argc)
 {
-  return Field (args[0], 1);
+  CAMLparamN (args, argc);
+  CAMLlocal1 (arg);
+  if (argc != 1) caml_invalid_argument ("cdr");
+  arg = args[0];
+  if (Is_long (arg) || Tag_val (arg) != Tag_cons) caml_invalid_argument ("cdr");
+  CAMLreturn (Field (arg, 1));
 }
 
 /* Rudimentary implementation of write */
