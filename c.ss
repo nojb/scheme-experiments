@@ -128,12 +128,8 @@
   (put-u8 port (fxlogand (fxsra n 8) #xff))
   (put-u8 port (fxlogand n #xff)))
 
-(define (iter f l)
-  (if (pair? l)
-    (begin (f (car l)) (iter f (cdr l)))))
-
 (define (write-toc-and-trailer port)
-  (iter (lambda (entry)
+  (for-each (lambda (entry)
           (let ((name (car entry)) (len (cadr entry)))
             (output-string port name)
             (output-binary-int port len)))
