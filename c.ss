@@ -17,11 +17,11 @@
     ((pair? exp)
       (case (car exp)
         ((cons)
-          (comp-args (cdr exp) `(makeblock 2 0 . ,cont)))
+          (comp-args (cdr exp) `(c-call "scheme_cons" 2 . ,cont)))
         ((car)
-          (comp-args (cdr exp) `(getfield 0 . ,cont)))
+          (comp-args (cdr exp) `(c-call "scheme_car" 1 . ,cont)))
         ((cdr)
-          (comp-args (cdr exp) `(getfield 1 . ,cont)))
+          (comp-args (cdr exp) `(c-call "scheme_cdr" 1 . ,cont)))
         (else
           (error 'comp-expr "Primitive not handled" exp))))
     (else (error 'comp-expr "Not handled" exp))))
@@ -59,6 +59,16 @@
 (define MAKEBLOCK 62)
 (define GETFIELD 71)
 (define CONSTEMPTYLIST 148)
+(define C-CALLN 98)
+
+(define reloc-info '())
+
+(define (enter kind name)
+  (set! reloc-info (cons `(,kind ,name ,out-position) reloc-info)))
+
+(define (slot-for-c-prim name)
+  (enter 'Reloc-primitive name)
+  (out-int 0))
 
 (define (emit-instr code)
   (case (car code)
@@ -85,6 +95,11 @@
       (out GETFIELD)
       (out-int (cadr code))
       (emit-instr (cddr code)))
+    ((c-call)
+      (out C-CALLN)
+      (out-int (caddr code))
+      (slot-for-c-prim (cadr code))
+      (emit-instr (cdddr code)))
     ((stop)
       (out STOP))
     (else
@@ -142,6 +157,8 @@
 
 (define (main)
   (emit-instr (compile-phrase (read)))
+  (display reloc-info)
+  (newline)
   (link-bytecode "a.out"))
 
 (main)
