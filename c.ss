@@ -5,7 +5,7 @@
     ((pair? exprl)
       (cond
         ((null? (cdr exprl)) (comp-expr (car exprl) cont))
-        (else (comp-expr (car exprl) `(push . ,(comp-expr-list (cdr exprl) cont))))))
+        (else (comp-expr (car exprl) (cons* 'push (comp-expr-list (cdr exprl) cont))))))
     (else cont)))
 
 (define (comp-args argl cont)
@@ -13,15 +13,15 @@
 
 (define (comp-expr exp cont)
   (cond
-    ((or (null? exp) (integer? exp)) `(const ,exp . ,cont))
+    ((or (null? exp) (integer? exp)) (cons* 'const exp cont))
     ((pair? exp)
       (case (car exp)
         ((cons)
-          (comp-args (cdr exp) `(c-call "scheme_cons" 2 . ,cont)))
+          (comp-args (cdr exp) (cons* 'c-call "scheme_cons" 2 cont)))
         ((car)
-          (comp-args (cdr exp) `(c-call "scheme_car" 1 . ,cont)))
+          (comp-args (cdr exp) (cons* 'c-call "scheme_car" 1 cont)))
         ((cdr)
-          (comp-args (cdr exp) `(c-call "scheme_cdr" 1 . ,cont)))
+          (comp-args (cdr exp) (cons* 'c-call "scheme_cdr" 1 cont)))
         (else
           (error 'comp-expr "Primitive not handled" exp))))
     (else (error 'comp-expr "Not handled" exp))))
@@ -64,10 +64,10 @@
 (define reloc-info '())
 
 (define (enter kind name)
-  (set! reloc-info (cons `(,kind ,name ,out-position) reloc-info)))
+  (set! reloc-info (cons (cons kind (cons name out-position)) reloc-info)))
 
 (define (slot-for-c-prim name)
-  (enter 'Reloc-primitive name)
+  (enter 'reloc-primitive name)
   (out-int 0))
 
 (define (emit-instr code)
@@ -105,6 +105,24 @@
     (else
       (error 'emit-instr "Not handled" code))))
 
+(define-record-type numtable (fields (mutable cnt) (mutable tbl)))
+
+(define empty-numtable '(0 . ()))
+
+(define (find-numtable nt key)
+  (cdr (assoc key (numtable-tbl nt))))
+
+(define (enter-numtable nt key)
+  (let ((n (+ (numtable-cnt nt) 1)))
+    (numtable-cnt-set! nt n)
+    (numtable-tbl-set! (cons (cons key n) (numtable-tbl nt)))))
+
+(define (incr-numtable nt key)
+  (let ((n (+ (numtable-cnt nt) 1)))
+    (numtable-cnt-set! nt n)))
+
+(define c-prim-table (make-numtable 0 '()))
+
 (define section-table '())
 (define section-beginning 0)
 
@@ -114,7 +132,7 @@
 
 (define (record port name)
   (let ((pos (port-position port)))
-    (set! section-table (cons `(,name ,(- pos section-beginning)) section-table))
+    (set! section-table (cons (cons name (- pos section-beginning)) section-table))
     (set! section-beginning pos)))
 
 (define exec-magic-number "Caml1999X011")
@@ -130,7 +148,7 @@
 
 (define (write-toc-and-trailer port)
   (for-each (lambda (entry)
-          (let ((name (car entry)) (len (cadr entry)))
+          (let ((name (car entry)) (len (cdr entry)))
             (output-string port name)
             (output-binary-int port len)))
     (reverse section-table))
