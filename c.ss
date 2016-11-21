@@ -163,4 +163,42 @@
   (emit-instr (compile-phrase (read)))
   (link-bytecode "a.out"))
 
+(define CODE-INT32 #x2)
+(define CODE-BLOCK32 #x8)
+
+(define-values (extern-port flush) (open-bytevector-output-port))
+
+(define (store32 port v)
+  (let ((get (lambda (i) (bitwise-and (bitwise-arithmetic-shift-right v i) #xff))))
+    (put-u8 port (get 24))
+    (put-u8 port (get 16))
+    (put-u8 port (get 8))
+    (put-u8 port (get 0))))
+
+(define (writecode32 code v)
+  (put-u8 extern-port code)
+  (store32 extern-port v))
+
+(define (hd tag sz)
+  (bitwise-ior
+    (bitwise-arithmetic-shift-left (bitwise-and sz #x3fffffffffffff) 10)
+    (bitwise-and tag #xf)))
+
+(define (extern-rec v)
+  (cond
+    ((integer? v)
+      (writecode32 CODE-INT32 v))
+    ((pair? v)
+      (let* ((tag (car v)) (fields (cdr v)))
+        (writecode32 CODE-BLOCK32 (hd tag (length fields)))
+        (for-each extern-rec fields)))
+    (else
+      (error 'extern-rec "Not handled" v))))
+
+(define (extern v)
+  (extern-rec v)
+  (flush))
+
+(define object-tag 248)
+
 (main)
