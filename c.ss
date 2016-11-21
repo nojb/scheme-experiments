@@ -165,6 +165,7 @@
 
 (define CODE-INT32 #x2)
 (define CODE-BLOCK32 #x8)
+(define CODE-STRING32 #xA)
 
 (define-values (extern-port flush) (open-bytevector-output-port))
 
@@ -184,10 +185,17 @@
     (bitwise-arithmetic-shift-left (bitwise-and sz #x3fffffffffffff) 10)
     (bitwise-and tag #xf)))
 
+(define object-tag 248)
+(define string-tag 252)
+
 (define (extern-rec v)
   (cond
     ((integer? v)
       (writecode32 CODE-INT32 v))
+    ((string? v)
+      (let* ((data (string->utf8 v)) (len (bytevector-length data)))
+        (writecode32 CODE-STRING32 (hd string-tag len))
+        (put-bytevector extern-port data 0 len)))
     ((pair? v)
       (let* ((tag (car v)) (fields (cdr v)))
         (writecode32 CODE-BLOCK32 (hd tag (length fields)))
@@ -199,6 +207,9 @@
   (extern-rec v)
   (flush))
 
-(define object-tag 248)
+(define builtin-exceptions
+  '("Out_of_memory" "Sys_error" "Failure" "Invalid_argument"
+     "End_of_file" "Division_by_zero" "Not_found" "Match_failure"
+     "Stack_overflow" "Sys_blocked_io" "Assert_failure" "Undefined_recursive_module"))
 
 (main)
